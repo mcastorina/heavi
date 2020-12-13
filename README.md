@@ -1,5 +1,5 @@
-# til
-`til` is a CLI utility to make text processing up until a point easier.
+# heavi
+`heavi` is a CLI utility to make text processing up until a point easier.
 
 ## Use cases
 * print a file until a matched line (exclusive)
@@ -7,11 +7,11 @@
 
 ## Examples
 ```
-$ seq 5 | til 3
+$ seq 5 | heavi 3
 1
 2
 
-$ seq 5 | til -v 3
+$ seq 5 | heavi -v 3
 4
 5
 ```
@@ -30,5 +30,5 @@ have two functions we can perform mathematical functions on. Describing
 Heaviside in this way would be simplified to using the x coordinate
 (the line number), however that defeats the usefulness of this tool.
 
-Interesting ideas; for now `til` will remain a simple binary Heaviside
+Interesting ideas; for now `heavi` will remain a simple binary Heaviside
 function.
