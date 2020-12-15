@@ -43,14 +43,16 @@ fn main() -> Result<(), HeaviError> {
 
     // Iterate through stream
     // ------------------------------------------------------------
-    let re = Regex::new(pattern)?;
+    // Prepend multiline mode to pattern
+    let re = Regex::new(&format!("(?m){}", pattern))?;
     let mut stdout = io::stdout();
 
     let mut dbuf = [0; BUF_SIZE];
     let mut n = stream.read(&mut dbuf)?;
+    let mut dbuf_len = n;
     if !invert {
-        while n != 0 {
-            if let Some(m) = re.find(&dbuf) {
+        while dbuf_len > 0 {
+            if let Some(m) = re.find(&dbuf[..dbuf_len]) {
                 let sect = &dbuf[..m.start()];
                 // last newline before pattern
                 if let Some(idx) = sect.iter().rev().position(|&r| r == 10) {
@@ -58,15 +60,23 @@ fn main() -> Result<(), HeaviError> {
                 }
                 break;
             }
-            stdout.write(&dbuf[..BUF_SIZE / 2])?;
+            if dbuf_len == BUF_SIZE {
+                stdout.write(&dbuf[..BUF_SIZE / 2])?;
 
-            // iterate through the file
-            dbuf.copy_within(BUF_SIZE / 2.., 0);
-            n = stream.read(&mut dbuf[BUF_SIZE / 2..])?;
+                // iterate through the file
+                // |__buf1__|__buf2__|
+                dbuf.copy_within(BUF_SIZE / 2.., 0);
+                n = stream.read(&mut dbuf[BUF_SIZE / 2..])?;
+
+                // |__buf2__|__n__|
+                dbuf_len = BUF_SIZE / 2 + n;
+            } else {
+                // no more data to read in
+                stdout.write(&dbuf[..dbuf_len])?;
+                break;
+            }
         }
     } else {
-        let mut dbuf_len = n;
-
         // find the match
         while dbuf_len > 0 {
             let idx = match re.find(&dbuf) {
