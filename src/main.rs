@@ -5,7 +5,7 @@ use std::io::{self, Write};
 
 const BUF_SIZE: usize = 4096;
 
-fn main() {
+fn main() -> Result<(), HeaviError> {
     let matches = App::new("heavi")
         .version("0.1.0")
         .author("miccah <m.castorina93@gmail.com>")
@@ -35,7 +35,7 @@ fn main() {
     let pattern = matches.value_of("PATTERN").unwrap();
 
     let mut stream = match matches.value_of("FILE") {
-        Some(file) => Box::new(File::open(file).unwrap()) as Box<dyn io::Read>, // FIXME: unwrap
+        Some(file) => Box::new(File::open(file)?) as Box<dyn io::Read>,
         None => Box::new(io::stdin()) as Box<dyn io::Read>,
     };
 
@@ -43,26 +43,26 @@ fn main() {
 
     // Iterate through stream
     // ------------------------------------------------------------
-    let re = Regex::new(pattern).unwrap(); // FIXME: unwrap
+    let re = Regex::new(pattern)?;
     let mut stdout = io::stdout();
 
     let mut dbuf = [0; BUF_SIZE];
-    let mut n = stream.read(&mut dbuf).unwrap(); // FIXME: unwrap
+    let mut n = stream.read(&mut dbuf)?;
     if !invert {
         while n != 0 {
             if let Some(m) = re.find(&dbuf) {
                 let sect = &dbuf[..m.start()];
                 // last newline before pattern
                 if let Some(idx) = sect.iter().rev().position(|&r| r == 10) {
-                    stdout.write(&dbuf[..m.start() - idx]).unwrap(); // FIXME: unwrap
+                    stdout.write(&dbuf[..m.start() - idx])?;
                 }
                 break;
             }
-            stdout.write(&dbuf[..BUF_SIZE / 2]).unwrap(); // FIXME: unwrap
+            stdout.write(&dbuf[..BUF_SIZE / 2])?;
 
             // iterate through the file
             dbuf.copy_within(BUF_SIZE / 2.., 0);
-            n = stream.read(&mut dbuf[BUF_SIZE / 2..]).unwrap(); // FIXME: unwrap
+            n = stream.read(&mut dbuf[BUF_SIZE / 2..])?;
         }
     } else {
         let mut dbuf_len = n;
@@ -78,7 +78,7 @@ fn main() {
                 // |_match_|__dbuf_len-idx__|
                 //      idx^        dbuf_len^
                 dbuf.copy_within(idx.., 0);
-                n = stream.read(&mut dbuf[dbuf_len - idx..]).unwrap(); // FIXME: unwrap
+                n = stream.read(&mut dbuf[dbuf_len - idx..])?;
 
                 // |__dbuf_len-idx__|_n_|
                 dbuf_len = dbuf_len - idx + n;
@@ -88,7 +88,7 @@ fn main() {
             if dbuf_len == BUF_SIZE {
                 // |__buf1__|__buf2__|
                 dbuf.copy_within(BUF_SIZE / 2.., 0);
-                n = stream.read(&mut dbuf[BUF_SIZE / 2..]).unwrap(); // FIXME: unwrap
+                n = stream.read(&mut dbuf[BUF_SIZE / 2..])?;
 
                 // |__buf2__|__n__|
                 dbuf_len = BUF_SIZE / 2 + n;
@@ -108,20 +108,54 @@ fn main() {
                 // |_CR_|__dbuf_len-idx__|
                 //   idx^        dbuf_len^
                 dbuf.copy_within(idx.., 0);
-                n = stream.read(&mut dbuf[BUF_SIZE - idx..]).unwrap(); // FIXME: unwrap
+                n = stream.read(&mut dbuf[BUF_SIZE - idx..])?;
 
                 // |__dbuf_len-idx__|_n_|
                 dbuf_len = dbuf_len - idx + n;
                 break;
             }
-            n = stream.read(&mut dbuf).unwrap(); // FIXME: unwrap
+            n = stream.read(&mut dbuf)?;
             dbuf_len = n;
         }
 
         // print the rest of the file
         while dbuf_len > 0 {
-            stdout.write(&dbuf[..dbuf_len]).unwrap(); // FIXME: unwrap
-            dbuf_len = stream.read(&mut dbuf).unwrap(); // FIXME: unwrap
+            stdout.write(&dbuf[..dbuf_len])?;
+            dbuf_len = stream.read(&mut dbuf)?;
         }
+    }
+    Ok(())
+}
+
+use std::fmt::{Debug, Display, Error, Formatter};
+
+enum HeaviError {
+    IOError(io::Error),
+    RegexError(regex::Error),
+}
+impl Display for HeaviError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match &self {
+            HeaviError::IOError(x) => write!(f, "{}", x),
+            HeaviError::RegexError(x) => write!(f, "{}", x),
+        }
+    }
+}
+impl Debug for HeaviError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match &self {
+            HeaviError::IOError(x) => write!(f, "IOError({})", x),
+            HeaviError::RegexError(x) => write!(f, "RegexError({})", x),
+        }
+    }
+}
+impl From<io::Error> for HeaviError {
+    fn from(err: io::Error) -> HeaviError {
+        HeaviError::IOError(err)
+    }
+}
+impl From<regex::Error> for HeaviError {
+    fn from(err: regex::Error) -> HeaviError {
+        HeaviError::RegexError(err)
     }
 }
