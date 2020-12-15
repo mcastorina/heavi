@@ -65,58 +65,63 @@ fn main() {
             n = stream.read(&mut dbuf[BUF_SIZE / 2..]).unwrap(); // FIXME: unwrap
         }
     } else {
+        let mut dbuf_len = n;
+
         // find the match
-        while dbuf[0] != 0 {
+        while dbuf_len > 0 {
             let idx = match re.find(&dbuf) {
                 Some(m) => Some(m.end()),
                 None => None,
             };
             if let Some(idx) = idx {
                 // shift out the match
+                // |_match_|__dbuf_len-idx__|
+                //      idx^        dbuf_len^
                 dbuf.copy_within(idx.., 0);
-                n = stream.read(&mut dbuf[BUF_SIZE - idx..]).unwrap(); // FIXME: unwrap
-                if n < idx {
-                    // fill with 0
-                    for i in BUF_SIZE-idx..BUF_SIZE {
-                        dbuf[i] = 0;
-                    }
-                }
+                n = stream.read(&mut dbuf[dbuf_len - idx..]).unwrap(); // FIXME: unwrap
+
+                // |__dbuf_len-idx__|_n_|
+                dbuf_len = dbuf_len - idx + n;
                 break;
             }
             // iterate through the file
-            dbuf.copy_within(BUF_SIZE / 2.., 0);
-            n = stream.read(&mut dbuf[BUF_SIZE / 2..]).unwrap(); // FIXME: unwrap
+            if dbuf_len == BUF_SIZE {
+                // |__buf1__|__buf2__|
+                dbuf.copy_within(BUF_SIZE / 2.., 0);
+                n = stream.read(&mut dbuf[BUF_SIZE / 2..]).unwrap(); // FIXME: unwrap
+
+                // |__buf2__|__n__|
+                dbuf_len = BUF_SIZE / 2 + n;
+            } else {
+                // no more data to read in
+                dbuf = [0; BUF_SIZE];
+                dbuf_len = 0;
+            }
         }
 
         // find the newline
-        while dbuf[0] != 0 {
+        while dbuf_len > 0 {
             let idx = dbuf.iter().position(|&r| r == 10);
             if let Some(idx) = idx {
+                let idx = idx + 1;
                 // shift out the newline
-                dbuf.copy_within(idx+1.., 0);
-                n = stream.read(&mut dbuf[BUF_SIZE-(idx+1)..]).unwrap(); // FIXME: unwrap
-                if n < idx+1 {
-                    // fill with 0
-                    for i in BUF_SIZE-(idx+1)..BUF_SIZE {
-                        dbuf[i] = 0;
-                    }
-                }
+                // |_CR_|__dbuf_len-idx__|
+                //   idx^        dbuf_len^
+                dbuf.copy_within(idx.., 0);
+                n = stream.read(&mut dbuf[BUF_SIZE - idx..]).unwrap(); // FIXME: unwrap
+
+                // |__dbuf_len-idx__|_n_|
+                dbuf_len = dbuf_len - idx + n;
                 break;
             }
             n = stream.read(&mut dbuf).unwrap(); // FIXME: unwrap
-            if n < BUF_SIZE {
-                // fill with 0
-                for i in n..BUF_SIZE {
-                    dbuf[i] = 0;
-                }
-            }
+            dbuf_len = n;
         }
 
         // print the rest of the file
-        stdout.write(&dbuf).unwrap(); // FIXME: unwrap
-        while n != 0 {
-            n = stream.read(&mut dbuf).unwrap(); // FIXME: unwrap
-            stdout.write(&dbuf[..n]).unwrap(); // FIXME: unwrap
+        while dbuf_len > 0 {
+            stdout.write(&dbuf[..dbuf_len]).unwrap(); // FIXME: unwrap
+            dbuf_len = stream.read(&mut dbuf).unwrap(); // FIXME: unwrap
         }
     }
 }
