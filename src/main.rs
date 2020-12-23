@@ -134,6 +134,7 @@ fn main() -> Result<(), HeaviError> {
             dbuf_len = stream.read(&mut dbuf)?;
         }
     }
+    stdout.flush()?;
     Ok(())
 }
 
