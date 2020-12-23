@@ -1,19 +1,19 @@
 # heavi
-`heavi` is a CLI utility to make text processing up until a point easier.
+`heavi` is a CLI utility to make text filtering up until a point easier. It is named after the Heaviside step function.
 
 ## Use cases
-* print a file until a matched line (exclusive)
 * print a file starting at a matched line (exclusive)
+* print a file until a matched line (exclusive)
 
 ## Examples
 ```
 $ seq 5 | heavi 3
-1
-2
-
-$ seq 5 | heavi -v 3
 4
 5
+
+$ seq 5 | heavi -v 3
+1
+2
 ```
 
 ## Ideas

@@ -50,7 +50,7 @@ fn main() -> Result<(), HeaviError> {
     let mut dbuf = [0; BUF_SIZE];
     let mut n = stream.read(&mut dbuf)?;
     let mut dbuf_len = n;
-    if !invert {
+    if invert {
         while dbuf_len > 0 {
             if let Some(m) = re.find(&dbuf[..dbuf_len]) {
                 let sect = &dbuf[..m.start()];
