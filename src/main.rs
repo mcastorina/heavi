@@ -6,7 +6,7 @@ fn main() -> Result<(), heavi::HeaviError> {
     let matches = App::new("heavi")
         .version("0.1.0")
         .author("miccah <m.castorina93@gmail.com>")
-        .about("Output text until a certain point")
+        .about("Output text starting at a certain point")
         .arg(
             Arg::with_name("PATTERN")
                 .help("Pattern to search for")
@@ -15,14 +15,19 @@ fn main() -> Result<(), heavi::HeaviError> {
         )
         .arg(
             Arg::with_name("FILE")
-                .help("File to output")
+                .help("File to read")
                 .required(false)
                 .index(2),
         )
         .arg(
             Arg::with_name("invert-match")
                 .short('v')
-                .help("Invert (start outputting at that point)"),
+                .help("Invert (stop outputting at that point)"),
+        )
+        .arg(
+            Arg::with_name("byte-mode")
+                .short('b')
+                .help("Byte processing instead of line processing"),
         )
         .get_matches();
 
@@ -37,15 +42,17 @@ fn main() -> Result<(), heavi::HeaviError> {
     };
 
     let invert = matches.is_present("invert-match");
+    let byte_mode = matches.is_present("byte-mode");
     let mut stdout = io::stdout();
 
     // Call relevant functions
     // ------------------------------------------------------------
-    if invert {
-        heavi::heavi_inv(stream, &mut stdout, pattern)?;
-    } else {
-        heavi::heavi(stream, &mut stdout, pattern)?;
-    }
+    match (byte_mode, invert) {
+        (true, true) => heavi::heavi_inv(stream, &mut stdout, pattern)?,
+        (true, false) => heavi::heavi(stream, &mut stdout, pattern)?,
+        (false, true) => heavi::heavi_line_inv(stream, &mut stdout, pattern)?,
+        (false, false) => heavi::heavi_line(stream, &mut stdout, pattern)?,
+    };
 
     stdout.flush()?;
     Ok(())

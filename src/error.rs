@@ -1,5 +1,5 @@
-use std::io;
 use std::fmt::{Debug, Display, Error, Formatter};
+use std::io;
 
 pub enum HeaviError {
     IOError(io::Error),

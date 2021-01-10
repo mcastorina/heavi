@@ -28,7 +28,7 @@ fn test_heavi_line_no_match() {
 
 #[test]
 fn test_heavi_line_match() {
-    test_heavi_line("a\nb\nc\n", "b", "c\n");
+    test_heavi_line("a\nb\nc\nd\ne\n", "c", "d\ne\n");
 }
 
 #[test]
@@ -43,20 +43,20 @@ fn test_heavi_line_inv_match() {
 
 #[test]
 fn test_heavi_no_match() {
-    test_heavi("abc", "d", "");
+    test_heavi("test", "pattern", "");
 }
 
 #[test]
 fn test_heavi_match() {
-    test_heavi("abc", "b", "c");
+    test_heavi("abcde", "c", "de");
 }
 
 #[test]
 fn test_heavi_inv_no_match() {
-    test_heavi_inv("abc", "d", "abc");
+    test_heavi_inv("test", "pattern", "test");
 }
 
 #[test]
 fn test_heavi_inv_match() {
-    test_heavi_inv("abc", "b", "a");
+    test_heavi_inv("abcde", "c", "ab");
 }
