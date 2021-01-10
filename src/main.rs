@@ -21,11 +21,13 @@ fn main() -> Result<(), heavi::HeaviError> {
         )
         .arg(
             Arg::with_name("invert-match")
+                .long("invert")
                 .short('v')
                 .help("Invert (stop outputting at that point)"),
         )
         .arg(
             Arg::with_name("byte-mode")
+                .long("byte-mode")
                 .short('b')
                 .help("Byte processing instead of line processing"),
         )
