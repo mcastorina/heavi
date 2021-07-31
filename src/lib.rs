@@ -100,13 +100,18 @@ pub fn heavi_line_inv<R: Read, W: Write>(
             // iterate through the file
             // |__buf1__|__buf2__|
             dbuf.copy_within(BUF_SIZE / 2.., 0);
-            n = input.read(&mut dbuf[BUF_SIZE / 2..])?;
-
-            // |__buf2__|__n__|
-            dbuf_len = BUF_SIZE / 2 + n;
+            dbuf_len = BUF_SIZE / 2;
+            while dbuf_len != BUF_SIZE {
+                n = input.read(&mut dbuf[dbuf_len..])?;
+                dbuf_len += n;
+                if n == 0 {
+                    break;
+                }
+            }
         } else {
+            // no more data to read in
             output.write(&dbuf[..dbuf_len])?;
-            dbuf_len = input.read(&mut dbuf)?;
+            break;
         }
     }
     Ok(())
@@ -187,14 +192,19 @@ pub fn heavi_inv<R: Read, W: Write>(
             // iterate through the file
             // |__buf1__|__buf2__|
             dbuf.copy_within(BUF_SIZE / 2.., 0);
-            n = input.read(&mut dbuf[BUF_SIZE / 2..])?;
 
-            // |__buf2__|__n__|
-            dbuf_len = BUF_SIZE / 2 + n;
+            dbuf_len = BUF_SIZE / 2;
+            while dbuf_len != BUF_SIZE {
+                n = input.read(&mut dbuf[dbuf_len..])?;
+                dbuf_len += n;
+                if n == 0 {
+                    break;
+                }
+            }
         } else {
             // no more data to read in
             output.write(&dbuf[..dbuf_len])?;
-            dbuf_len = input.read(&mut dbuf)?;
+            break;
         }
     }
     Ok(())
