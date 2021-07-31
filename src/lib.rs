@@ -105,9 +105,8 @@ pub fn heavi_line_inv<R: Read, W: Write>(
             // |__buf2__|__n__|
             dbuf_len = BUF_SIZE / 2 + n;
         } else {
-            // no more data to read in
             output.write(&dbuf[..dbuf_len])?;
-            break;
+            dbuf_len = input.read(&mut dbuf)?;
         }
     }
     Ok(())
@@ -118,6 +117,8 @@ pub fn heavi<R: Read, W: Write>(
     mut output: W,
     pattern: &str,
 ) -> Result<(), HeaviError> {
+    // `.` will not match newlines as a quirk of regex
+    // [\s\S] may be used instead
     let re = Regex::new(&format!("(?m){}", pattern))?;
 
     let mut dbuf = [0; BUF_SIZE];
@@ -168,6 +169,8 @@ pub fn heavi_inv<R: Read, W: Write>(
     mut output: W,
     pattern: &str,
 ) -> Result<(), HeaviError> {
+    // `.` will not match newlines as a quirk of regex
+    // [\s\S] may be used instead
     let re = Regex::new(&format!("(?m){}", pattern))?;
 
     let mut dbuf = [0; BUF_SIZE];
@@ -191,7 +194,7 @@ pub fn heavi_inv<R: Read, W: Write>(
         } else {
             // no more data to read in
             output.write(&dbuf[..dbuf_len])?;
-            break;
+            dbuf_len = input.read(&mut dbuf)?;
         }
     }
     Ok(())
