@@ -209,3 +209,36 @@ pub fn heavi_inv<R: Read, W: Write>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_heavi_line(input: &str, pattern: &str, expected: &str) {
+        let mut output: Vec<u8> = vec![];
+        assert!(heavi_line(input.as_bytes(), &mut output, pattern).is_ok());
+        assert_eq!(String::from_utf8(output).unwrap(), expected);
+    }
+    fn test_heavi_line_inv(input: &str, pattern: &str, expected: &str) {
+        let mut output: Vec<u8> = vec![];
+        assert!(heavi_line_inv(input.as_bytes(), &mut output, pattern).is_ok());
+        assert_eq!(String::from_utf8(output).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_heavi_line_border_match() {
+        let mut s = "A".repeat(BUF_SIZE - 4);
+        s.push_str("pattern\nfoo bar\n");
+        test_heavi_line(&s, "pattern", "foo bar\n");
+    }
+
+    #[test]
+    fn test_heavi_line_inv_border_match() {
+        let mut s = "A".repeat(BUF_SIZE / 2) + "\n";
+        s.push_str("foo bar\n");
+        let expected = s.clone();
+        s.push_str(&("A".repeat(BUF_SIZE / 2 - 13)));
+        s.push_str("pattern\nbaz buzz\n");
+        test_heavi_line_inv(&s, "pattern", &expected);
+    }
+}
