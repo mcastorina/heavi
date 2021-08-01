@@ -3,10 +3,10 @@
 easier. It is named after the Heaviside step function.
 
 ## Use cases
-* print a file starting at a matched line (exclusive)
-* print a file until a matched line (exclusive)
-* print a file starting at a match (exclusive)
-* print a file until a match (exclusive)
+* print a file starting at a matched line
+* print a file until a matched line
+* print a file starting at a match
+* print a file until a match
 
 ## Examples
 ```
@@ -25,4 +25,5 @@ $ seq 5 | heavi -v 3
 | ---- | ----------- |
 | `-v` | In**v**ert the Heaviside function; Output the file up until the match |
 | `-b` | **B**yte mode; Byte processing instead of line processing |
+| `-i` | **I**nclusive; Output the match in addition to other output |
 

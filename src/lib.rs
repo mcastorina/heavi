@@ -121,6 +121,7 @@ fn read<R: BufRead>(input: &mut R, buf: &mut [u8]) -> Result<usize, HeaviError> 
 pub struct Heavi<W: Write> {
     pub line_mode: bool,
     pub invert: bool,
+    pub inclusive: bool,
     pub output: W,
 }
 
@@ -131,8 +132,11 @@ impl<W: Write> HeaviParser for Heavi<W> {
         }
         Ok(HeaviInst::Cont)
     }
-    fn at_match(&mut self, _: &[u8]) -> Result<HeaviInst, HeaviError> {
-        // do not print anything
+    fn at_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError> {
+        // only print if inclusive
+        if self.inclusive {
+            self.output.write(buf)?;
+        }
         Ok(if self.invert {
             HeaviInst::Stop
         } else {

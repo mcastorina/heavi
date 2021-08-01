@@ -32,6 +32,12 @@ fn main() -> Result<(), HeaviError> {
                 .short('b')
                 .help("Byte processing instead of line processing"),
         )
+        .arg(
+            Arg::with_name("inclusive")
+                .long("inclusive")
+                .short('i')
+                .help("Output the matched line or bytes"),
+        )
         .get_matches();
 
     // Get arguments
@@ -46,6 +52,7 @@ fn main() -> Result<(), HeaviError> {
 
     let invert = matches.is_present("invert-match");
     let byte_mode = matches.is_present("byte-mode");
+    let inclusive = matches.is_present("inclusive");
     let mut stdout = io::stdout();
 
     // Call relevant functions
@@ -53,6 +60,7 @@ fn main() -> Result<(), HeaviError> {
     Heavi {
         line_mode: !byte_mode,
         invert: invert,
+        inclusive: inclusive,
         output: &stdout,
     }
     .parse(BufReader::new(stream), pattern)?;
