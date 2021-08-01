@@ -1,8 +1,9 @@
 use clap_v3::{App, Arg};
+use heavi::{Heavi, HeaviError, HeaviParser};
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, BufReader, Write};
 
-fn main() -> Result<(), heavi::HeaviError> {
+fn main() -> Result<(), HeaviError> {
     let matches = App::new("heavi")
         .version("0.1.0")
         .author("miccah <m.castorina93@gmail.com>")
@@ -49,12 +50,12 @@ fn main() -> Result<(), heavi::HeaviError> {
 
     // Call relevant functions
     // ------------------------------------------------------------
-    match (byte_mode, invert) {
-        (true, true) => heavi::heavi_inv(stream, &mut stdout, pattern)?,
-        (true, false) => heavi::heavi(stream, &mut stdout, pattern)?,
-        (false, true) => heavi::heavi_line_inv(stream, &mut stdout, pattern)?,
-        (false, false) => heavi::heavi_line(stream, &mut stdout, pattern)?,
-    };
+    Heavi {
+        line_mode: !byte_mode,
+        invert: invert,
+        output: &stdout,
+    }
+    .parse(BufReader::new(stream), pattern)?;
 
     stdout.flush()?;
     Ok(())

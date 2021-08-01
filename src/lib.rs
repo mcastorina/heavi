@@ -2,243 +2,153 @@ pub mod error;
 pub use error::HeaviError;
 
 use regex::bytes::Regex;
-use std::io::{Read, Write};
+use std::io::{BufRead, Write};
 
 const BUF_SIZE: usize = 4096;
 
-pub fn heavi_line<R: Read, W: Write>(
-    mut input: R,
-    mut output: W,
-    pattern: &str,
-) -> Result<(), HeaviError> {
-    let re = Regex::new(&format!("(?m){}", pattern))?;
-
-    let mut dbuf = [0; BUF_SIZE];
-    let mut n = input.read(&mut dbuf)?;
-    let mut dbuf_len = n;
-    // find the match
-    while dbuf_len > 0 {
-        let idx = match re.find(&dbuf) {
-            Some(m) => Some(m.end()),
-            None => None,
-        };
-        if let Some(idx) = idx {
-            // shift out the match
-            // |_match_|__dbuf_len-idx__|
-            //      idx^        dbuf_len^
-            dbuf.copy_within(idx.., 0);
-            n = input.read(&mut dbuf[dbuf_len - idx..])?;
-
-            // |__dbuf_len-idx__|_n_|
-            dbuf_len = dbuf_len - idx + n;
-            break;
-        }
-        // iterate through the file
-        if dbuf_len == BUF_SIZE {
-            // |__buf1__|__buf2__|
-            dbuf.copy_within(BUF_SIZE / 2.., 0);
-            n = input.read(&mut dbuf[BUF_SIZE / 2..])?;
-
-            // |__buf2__|__n__|
-            dbuf_len = BUF_SIZE / 2 + n;
-        } else {
-            // no more data to read in
-            dbuf = [0; BUF_SIZE];
-            dbuf_len = 0;
-        }
-    }
-
-    // find the newline
-    while dbuf_len > 0 {
-        let idx = dbuf.iter().position(|&r| r == 10);
-        if let Some(idx) = idx {
-            let idx = idx + 1;
-            // shift out the newline
-            // |_CR_|__dbuf_len-idx__|
-            //   idx^        dbuf_len^
-            dbuf.copy_within(idx.., 0);
-            n = input.read(&mut dbuf[BUF_SIZE - idx..])?;
-
-            // |__dbuf_len-idx__|_n_|
-            dbuf_len = dbuf_len - idx + n;
-            break;
-        }
-        n = input.read(&mut dbuf)?;
-        dbuf_len = n;
-    }
-
-    // print the rest of the file
-    while dbuf_len > 0 {
-        output.write(&dbuf[..dbuf_len])?;
-        dbuf_len = input.read(&mut dbuf)?;
-    }
-    Ok(())
+#[derive(PartialEq, Debug)]
+pub enum HeaviInst {
+    Cont, // continue processing
+    Stop, // stop processing
 }
 
-pub fn heavi_line_inv<R: Read, W: Write>(
-    mut input: R,
-    mut output: W,
-    pattern: &str,
-) -> Result<(), HeaviError> {
-    let re = Regex::new(&format!("(?m){}", pattern))?;
+pub trait HeaviParser {
+    fn before_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError>;
+    fn at_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError>;
+    fn after_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError>;
 
-    let mut dbuf = [0; BUF_SIZE];
-    let mut n = input.read(&mut dbuf)?;
-    let mut dbuf_len = n;
-    while dbuf_len > 0 {
-        if let Some(m) = re.find(&dbuf[..dbuf_len]) {
-            let sect = &dbuf[..m.start()];
-            // last newline before pattern
-            if let Some(idx) = sect.iter().rev().position(|&r| r == 10) {
-                output.write(&dbuf[..m.start() - idx])?;
+    fn parse<R: BufRead>(&mut self, input: R, pattern: &str) -> Result<(), HeaviError>;
+
+    fn parse_bytes<R: BufRead>(&mut self, mut input: R, pattern: &str) -> Result<(), HeaviError> {
+        let re = Regex::new(&format!("{}", pattern))?;
+        let mut dbuf = [0; BUF_SIZE];
+        let mut dbuf_len = read(&mut input, &mut dbuf)?;
+
+        while dbuf_len > 0 {
+            if let Some(m) = re.find(&dbuf) {
+                if self.before_match(&dbuf[..m.start()])? == HeaviInst::Stop {
+                    return Ok(());
+                }
+                if self.at_match(&dbuf[m.start()..m.end()])? == HeaviInst::Stop {
+                    return Ok(());
+                }
+                if self.after_match(&dbuf[m.end()..dbuf_len])? == HeaviInst::Stop {
+                    return Ok(());
+                }
+                dbuf_len = read(&mut input, &mut dbuf)?;
+                break;
             }
-            break;
+            if dbuf_len == BUF_SIZE {
+                // discard first half of dbuf
+                if self.before_match(&dbuf[..BUF_SIZE / 2])? == HeaviInst::Stop {
+                    return Ok(());
+                }
+                dbuf.copy_within(BUF_SIZE / 2.., 0);
+                // read in next half of dbuf
+                let n = read(&mut input, &mut dbuf[BUF_SIZE / 2..])?;
+                dbuf_len = BUF_SIZE / 2 + n;
+            } else {
+                // no more data to read, we never found a match
+                self.before_match(&dbuf[..dbuf_len])?;
+                return Ok(());
+            }
         }
-        if dbuf_len == BUF_SIZE {
-            output.write(&dbuf[..BUF_SIZE / 2])?;
 
-            // iterate through the file
-            // |__buf1__|__buf2__|
-            dbuf.copy_within(BUF_SIZE / 2.., 0);
-            dbuf_len = BUF_SIZE / 2;
-            while dbuf_len != BUF_SIZE {
-                n = input.read(&mut dbuf[dbuf_len..])?;
-                dbuf_len += n;
-                if n == 0 {
+        // after match, go through the rest of the data
+        while dbuf_len > 0 {
+            if self.after_match(&dbuf[..dbuf_len])? == HeaviInst::Stop {
+                return Ok(());
+            }
+            dbuf_len = read(&mut input, &mut dbuf)?;
+        }
+
+        Ok(())
+    }
+    fn parse_lines<R: BufRead>(&mut self, mut input: R, pattern: &str) -> Result<(), HeaviError> {
+        // NOTE: patterns may not contain newlines in this mode
+        let re = Regex::new(&format!("{}", pattern))?;
+
+        let mut last_line = vec![];
+        let _ = input.read_until(b'\n', &mut last_line)?;
+        if re.find(&last_line).is_some() {
+            if self.at_match(&last_line)? == HeaviInst::Stop {
+                return Ok(());
+            }
+        } else {
+            loop {
+                let mut line = vec![];
+                if self.before_match(&last_line)? == HeaviInst::Stop {
+                    return Ok(());
+                }
+                if input.read_until(b'\n', &mut line)? == 0 {
                     break;
                 }
-            }
-        } else {
-            // no more data to read in
-            output.write(&dbuf[..dbuf_len])?;
-            break;
-        }
-    }
-    Ok(())
-}
-
-pub fn heavi<R: Read, W: Write>(
-    mut input: R,
-    mut output: W,
-    pattern: &str,
-) -> Result<(), HeaviError> {
-    // `.` will not match newlines as a quirk of regex
-    // [\s\S] may be used instead
-    let re = Regex::new(&format!("(?m){}", pattern))?;
-
-    let mut dbuf = [0; BUF_SIZE];
-    let mut n = input.read(&mut dbuf)?;
-    let mut dbuf_len = n;
-    // find the match
-    while dbuf_len > 0 {
-        let idx = match re.find(&dbuf) {
-            Some(m) => Some(m.end()),
-            None => None,
-        };
-        if let Some(idx) = idx {
-            // shift out the match
-            // |_match_|__dbuf_len-idx__|
-            //      idx^        dbuf_len^
-            dbuf.copy_within(idx.., 0);
-            n = input.read(&mut dbuf[dbuf_len - idx..])?;
-
-            // |__dbuf_len-idx__|_n_|
-            dbuf_len = dbuf_len - idx + n;
-            break;
-        }
-        // iterate through the file
-        if dbuf_len == BUF_SIZE {
-            // |__buf1__|__buf2__|
-            dbuf.copy_within(BUF_SIZE / 2.., 0);
-            n = input.read(&mut dbuf[BUF_SIZE / 2..])?;
-
-            // |__buf2__|__n__|
-            dbuf_len = BUF_SIZE / 2 + n;
-        } else {
-            // no more data to read in
-            dbuf = [0; BUF_SIZE];
-            dbuf_len = 0;
-        }
-    }
-
-    // print the rest of the file
-    while dbuf_len > 0 {
-        output.write(&dbuf[..dbuf_len])?;
-        dbuf_len = input.read(&mut dbuf)?;
-    }
-    Ok(())
-}
-
-pub fn heavi_inv<R: Read, W: Write>(
-    mut input: R,
-    mut output: W,
-    pattern: &str,
-) -> Result<(), HeaviError> {
-    // `.` will not match newlines as a quirk of regex
-    // [\s\S] may be used instead
-    let re = Regex::new(&format!("(?m){}", pattern))?;
-
-    let mut dbuf = [0; BUF_SIZE];
-    let mut n = input.read(&mut dbuf)?;
-    let mut dbuf_len = n;
-    while dbuf_len > 0 {
-        if let Some(m) = re.find(&dbuf[..dbuf_len]) {
-            output.write(&dbuf[..m.start()])?;
-            break;
-        }
-        if dbuf_len == BUF_SIZE {
-            output.write(&dbuf[..BUF_SIZE / 2])?;
-
-            // iterate through the file
-            // |__buf1__|__buf2__|
-            dbuf.copy_within(BUF_SIZE / 2.., 0);
-
-            dbuf_len = BUF_SIZE / 2;
-            while dbuf_len != BUF_SIZE {
-                n = input.read(&mut dbuf[dbuf_len..])?;
-                dbuf_len += n;
-                if n == 0 {
+                if re.find(&line).is_some() {
+                    if self.at_match(&line)? == HeaviInst::Stop {
+                        return Ok(());
+                    }
                     break;
                 }
+                last_line = line;
             }
-        } else {
-            // no more data to read in
-            output.write(&dbuf[..dbuf_len])?;
+        }
+
+        // after match
+        let mut line = vec![];
+        while input.read_until(b'\n', &mut line)? != 0 {
+            if self.after_match(&line)? == HeaviInst::Stop {
+                return Ok(());
+            }
+            line.clear();
+        }
+        Ok(())
+    }
+}
+
+// try to fill the buffer and returns how many bytes read
+fn read<R: BufRead>(input: &mut R, buf: &mut [u8]) -> Result<usize, HeaviError> {
+    let mut total_read = input.read(buf)?;
+    while total_read < buf.len() {
+        let n = input.read(buf)?;
+        total_read += n;
+        if n == 0 {
             break;
         }
     }
-    Ok(())
+    Ok(total_read)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct Heavi<W: Write> {
+    pub line_mode: bool,
+    pub invert: bool,
+    pub output: W,
+}
 
-    fn test_heavi_line(input: &str, pattern: &str, expected: &str) {
-        let mut output: Vec<u8> = vec![];
-        assert!(heavi_line(input.as_bytes(), &mut output, pattern).is_ok());
-        assert_eq!(String::from_utf8(output).unwrap(), expected);
+impl<W: Write> HeaviParser for Heavi<W> {
+    fn before_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError> {
+        if self.invert {
+            self.output.write(buf)?;
+        }
+        Ok(HeaviInst::Cont)
     }
-    fn test_heavi_line_inv(input: &str, pattern: &str, expected: &str) {
-        let mut output: Vec<u8> = vec![];
-        assert!(heavi_line_inv(input.as_bytes(), &mut output, pattern).is_ok());
-        assert_eq!(String::from_utf8(output).unwrap(), expected);
+    fn at_match(&mut self, _: &[u8]) -> Result<HeaviInst, HeaviError> {
+        // do not print anything
+        Ok(if self.invert {
+            HeaviInst::Stop
+        } else {
+            HeaviInst::Cont
+        })
     }
-
-    #[test]
-    fn test_heavi_line_border_match() {
-        let mut s = "A".repeat(BUF_SIZE - 4);
-        s.push_str("pattern\nfoo bar\n");
-        test_heavi_line(&s, "pattern", "foo bar\n");
+    fn after_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError> {
+        // at_match will quit if the output is inverted
+        self.output.write(buf)?;
+        Ok(HeaviInst::Cont)
     }
-
-    #[test]
-    fn test_heavi_line_inv_border_match() {
-        let mut s = "A".repeat(BUF_SIZE / 2) + "\n";
-        s.push_str("foo bar\n");
-        let expected = s.clone();
-        s.push_str(&("A".repeat(BUF_SIZE / 2 - 13)));
-        s.push_str("pattern\nbaz buzz\n");
-        test_heavi_line_inv(&s, "pattern", &expected);
+    fn parse<R: BufRead>(&mut self, input: R, pattern: &str) -> Result<(), HeaviError> {
+        if self.line_mode {
+            self.parse_lines(input, pattern)
+        } else {
+            self.parse_bytes(input, pattern)
+        }
     }
 }

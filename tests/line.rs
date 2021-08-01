@@ -2,22 +2,46 @@ use heavi::*;
 
 fn test_heavi_line(input: &str, pattern: &str, expected: &str) {
     let mut output: Vec<u8> = vec![];
-    assert!(heavi_line(input.as_bytes(), &mut output, pattern).is_ok());
+    assert!(Heavi {
+        line_mode: true,
+        invert: false,
+        output: &mut output,
+    }
+    .parse(input.as_bytes(), pattern)
+    .is_ok());
     assert_eq!(String::from_utf8(output).unwrap(), expected);
 }
 fn test_heavi_line_inv(input: &str, pattern: &str, expected: &str) {
     let mut output: Vec<u8> = vec![];
-    assert!(heavi_line_inv(input.as_bytes(), &mut output, pattern).is_ok());
+    assert!(Heavi {
+        line_mode: true,
+        invert: true,
+        output: &mut output,
+    }
+    .parse(input.as_bytes(), pattern)
+    .is_ok());
     assert_eq!(String::from_utf8(output).unwrap(), expected);
 }
 fn test_heavi(input: &str, pattern: &str, expected: &str) {
     let mut output: Vec<u8> = vec![];
-    assert!(heavi(input.as_bytes(), &mut output, pattern).is_ok());
+    assert!(Heavi {
+        line_mode: false,
+        invert: false,
+        output: &mut output,
+    }
+    .parse(input.as_bytes(), pattern)
+    .is_ok());
     assert_eq!(String::from_utf8(output).unwrap(), expected);
 }
 fn test_heavi_inv(input: &str, pattern: &str, expected: &str) {
     let mut output: Vec<u8> = vec![];
-    assert!(heavi_inv(input.as_bytes(), &mut output, pattern).is_ok());
+    assert!(Heavi {
+        line_mode: false,
+        invert: true,
+        output: &mut output,
+    }
+    .parse(input.as_bytes(), pattern)
+    .is_ok());
     assert_eq!(String::from_utf8(output).unwrap(), expected);
 }
 
