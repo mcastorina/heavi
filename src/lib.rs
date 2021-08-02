@@ -109,7 +109,7 @@ pub trait HeaviParser {
 fn read<R: BufRead>(input: &mut R, buf: &mut [u8]) -> Result<usize, HeaviError> {
     let mut total_read = input.read(buf)?;
     while total_read < buf.len() {
-        let n = input.read(buf)?;
+        let n = input.read(&mut buf[total_read..])?;
         total_read += n;
         if n == 0 {
             break;
