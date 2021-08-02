@@ -93,3 +93,15 @@ fn test_heavi_inv_match() {
 fn test_heavi_multiline() {
     test_heavi("ab\ncd\ne", "b\nc", "d\ne");
 }
+
+#[test]
+fn test_blank() {
+    test_heavi("ab\ncd\n\nef", "^$", "\nef");
+    test_heavi("\ncd", "^$", "\ncd");
+}
+
+#[test]
+fn test_blank_line() {
+    test_heavi_line("ab\ncd\n\nef", "^$", "ef");
+    test_heavi_line("\ncd\n", "^$", "cd\n");
+}

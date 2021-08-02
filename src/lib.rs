@@ -20,7 +20,7 @@ pub trait HeaviParser {
     fn parse<R: BufRead>(&mut self, input: R, pattern: &str) -> Result<(), HeaviError>;
 
     fn parse_bytes<R: BufRead>(&mut self, mut input: R, pattern: &str) -> Result<(), HeaviError> {
-        let re = Regex::new(pattern)?;
+        let re = Regex::new(&format!("(?m){}", pattern))?;
         let mut dbuf = [0; BUF_SIZE];
         let mut dbuf_len = read(&mut input, &mut dbuf)?;
 
@@ -70,7 +70,7 @@ pub trait HeaviParser {
 
         let mut last_line = vec![];
         let _ = input.read_until(b'\n', &mut last_line)?;
-        if re.find(&last_line).is_some() {
+        if re.find(&last_line[..last_line.len() - 1]).is_some() {
             if self.at_match(&last_line)? == HeaviInst::Stop {
                 return Ok(());
             }
@@ -83,7 +83,8 @@ pub trait HeaviParser {
                 if input.read_until(b'\n', &mut line)? == 0 {
                     break;
                 }
-                if re.find(&line).is_some() {
+                // remove newline when checking for a match
+                if re.find(&line[..line.len() - 1]).is_some() {
                     if self.at_match(&line)? == HeaviInst::Stop {
                         return Ok(());
                     }
