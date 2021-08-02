@@ -6,6 +6,7 @@ fn test_heavi_line(input: &str, pattern: &str, expected: &str) {
         line_mode: true,
         invert: false,
         output: &mut output,
+        inclusive: false,
     }
     .parse(input.as_bytes(), pattern)
     .is_ok());
@@ -17,6 +18,7 @@ fn test_heavi_line_inv(input: &str, pattern: &str, expected: &str) {
         line_mode: true,
         invert: true,
         output: &mut output,
+        inclusive: false,
     }
     .parse(input.as_bytes(), pattern)
     .is_ok());
@@ -28,6 +30,7 @@ fn test_heavi(input: &str, pattern: &str, expected: &str) {
         line_mode: false,
         invert: false,
         output: &mut output,
+        inclusive: false,
     }
     .parse(input.as_bytes(), pattern)
     .is_ok());
@@ -39,6 +42,7 @@ fn test_heavi_inv(input: &str, pattern: &str, expected: &str) {
         line_mode: false,
         invert: true,
         output: &mut output,
+        inclusive: false,
     }
     .parse(input.as_bytes(), pattern)
     .is_ok());
@@ -83,4 +87,9 @@ fn test_heavi_inv_no_match() {
 #[test]
 fn test_heavi_inv_match() {
     test_heavi_inv("abcde", "c", "ab");
+}
+
+#[test]
+fn test_heavi_multiline() {
+    test_heavi("ab\ncd\ne", "b\nc", "d\ne");
 }
