@@ -1,5 +1,3 @@
-RM := rm -f
-
 RS_FILES := $(shell find src -type f)
 .DEFAULT_GOAL := build
 
@@ -25,4 +23,4 @@ test:
 
 .PHONY: clean
 clean:
-	$(RM) target/debug/repost
+	cargo clean
