@@ -24,7 +24,7 @@ pub trait HeaviParser {
         let mut dbuf = [0; BUF_SIZE];
         let mut dbuf_len = read(&mut input, &mut dbuf)?;
 
-        while dbuf_len > 0 {
+        loop {
             if let Some(m) = re.find(&dbuf) {
                 if self.before_match(&dbuf[..m.start()])? == HeaviInst::Stop {
                     return Ok(());
@@ -35,7 +35,6 @@ pub trait HeaviParser {
                 if self.after_match(&dbuf[m.end()..dbuf_len])? == HeaviInst::Stop {
                     return Ok(());
                 }
-                dbuf_len = read(&mut input, &mut dbuf)?;
                 break;
             }
             if dbuf_len == BUF_SIZE {
@@ -55,11 +54,12 @@ pub trait HeaviParser {
         }
 
         // after match, go through the rest of the data
+        // dbuf_len is guaranteed to be > 0 at this point
         while dbuf_len > 0 {
+            dbuf_len = read(&mut input, &mut dbuf)?;
             if self.after_match(&dbuf[..dbuf_len])? == HeaviInst::Stop {
                 return Ok(());
             }
-            dbuf_len = read(&mut input, &mut dbuf)?;
         }
 
         Ok(())
@@ -68,34 +68,26 @@ pub trait HeaviParser {
         // NOTE: patterns may not contain newlines in this mode
         let re = Regex::new(pattern)?;
 
-        let mut last_line = vec![];
-        input.read_until(b'\n', &mut last_line)?;
-        if re.find(&last_line[..last_line.len() - 1]).is_some() {
-            if self.at_match(&last_line)? == HeaviInst::Stop {
+        let mut line = vec![];
+        loop {
+            if input.read_until(b'\n', &mut line)? == 0 {
                 return Ok(());
             }
-        } else {
-            loop {
-                let mut line = vec![];
-                if self.before_match(&last_line)? == HeaviInst::Stop {
+            // remove newline when checking for a match
+            if re.find(&line[..line.len() - 1]).is_some() {
+                if self.at_match(&line)? == HeaviInst::Stop {
                     return Ok(());
                 }
-                if input.read_until(b'\n', &mut line)? == 0 {
-                    break;
-                }
-                // remove newline when checking for a match
-                if re.find(&line[..line.len() - 1]).is_some() {
-                    if self.at_match(&line)? == HeaviInst::Stop {
-                        return Ok(());
-                    }
-                    break;
-                }
-                last_line = line;
+                break;
             }
+            if self.before_match(&line)? == HeaviInst::Stop {
+                return Ok(());
+            }
+            line.clear();
         }
 
         // after match
-        let mut line = vec![];
+        line.clear();
         while input.read_until(b'\n', &mut line)? != 0 {
             if self.after_match(&line)? == HeaviInst::Stop {
                 return Ok(());
