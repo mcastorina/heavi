@@ -69,7 +69,7 @@ pub trait HeaviParser {
         let re = Regex::new(pattern)?;
 
         let mut last_line = vec![];
-        let _ = input.read_until(b'\n', &mut last_line)?;
+        input.read_until(b'\n', &mut last_line)?;
         if re.find(&last_line[..last_line.len() - 1]).is_some() {
             if self.at_match(&last_line)? == HeaviInst::Stop {
                 return Ok(());
@@ -129,14 +129,18 @@ pub struct Heavi<W: Write> {
 impl<W: Write> HeaviParser for Heavi<W> {
     fn before_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError> {
         if self.invert {
-            self.output.write(buf)?;
+            if self.output.write(buf).is_err() {
+                return Ok(HeaviInst::Stop);
+            }
         }
         Ok(HeaviInst::Cont)
     }
     fn at_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError> {
         // only print if inclusive
         if self.inclusive {
-            self.output.write(buf)?;
+            if self.output.write(buf).is_err() {
+                return Ok(HeaviInst::Stop);
+            }
         }
         Ok(if self.invert {
             HeaviInst::Stop
@@ -146,7 +150,9 @@ impl<W: Write> HeaviParser for Heavi<W> {
     }
     fn after_match(&mut self, buf: &[u8]) -> Result<HeaviInst, HeaviError> {
         // at_match will quit if the output is inverted
-        self.output.write(buf)?;
+        if self.output.write(buf).is_err() {
+            return Ok(HeaviInst::Stop);
+        }
         Ok(HeaviInst::Cont)
     }
     fn parse<R: BufRead>(&mut self, input: R, pattern: &str) -> Result<(), HeaviError> {
